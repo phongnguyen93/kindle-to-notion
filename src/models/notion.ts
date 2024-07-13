@@ -1,7 +1,7 @@
 require("dotenv").config();
 import { NotionAdapter } from "../adapters";
 import { GroupedClipping } from "../interfaces";
-import { CreatePageParams, Emoji, BlockType } from "../interfaces";
+import { CreatePageParams, Emoji, BlockType, Block } from "../interfaces";
 import {
   makeHighlightsBlocks,
   updateSync,
@@ -10,7 +10,7 @@ import {
 } from "../utils";
 
  
-async function createNewbookHighlights(title: string, author: string, highlights: string[],  notionInstance: NotionAdapter) {
+async function createNewbookHighlights(title: string, author: string, highlightBlocks: Block[],  notionInstance: NotionAdapter) {
   const createPageParams: CreatePageParams = {
     parentDatabaseId: process.env.BOOK_DB_ID as string,
     properties: {
@@ -18,7 +18,7 @@ async function createNewbookHighlights(title: string, author: string, highlights
       author: author,
       bookName: title,
     },
-    children: makeHighlightsBlocks(highlights, BlockType.quote),
+    children: highlightBlocks,
     icon: Emoji["🔖"],
   }
   await notionInstance.createPage(createPageParams);
@@ -92,15 +92,16 @@ export class Notion {
             
           } else {
             console.log(`📚 Book not present, creating notion page`);
-            if(book.highlights.length <= 100) {
-              await createNewbookHighlights(book.title, book.author, book.highlights, this.notion);
+            const hightlightBlocks = makeHighlightsBlocks(book.highlights, BlockType.paragraph)
+            if(hightlightBlocks.length <= 100) {
+              await createNewbookHighlights(book.title, book.author,hightlightBlocks, this.notion);
             } else {
               // handle pagination if there are more than 100 highlights
               let highlightsTracker = 0;
-              while(highlightsTracker < book.highlights.length) {
+              while(highlightsTracker < hightlightBlocks.length) {
                 if(highlightsTracker == 0) {
                   // create a new page for the first 100 highlights
-                  await createNewbookHighlights(book.title, book.author, book.highlights.slice(highlightsTracker, highlightsTracker+99), this.notion);
+                  await createNewbookHighlights(book.title, book.author, hightlightBlocks.slice(highlightsTracker, highlightsTracker+99), this.notion);
                   highlightsTracker += 99;
                 } else {
                   // insert the remaining highlights by paginations
@@ -108,7 +109,7 @@ export class Notion {
                   if(newBookId) {
                     await this.notion.appendBlockChildren(
                       newBookId, 
-                      makeBlocks(book.highlights.slice(highlightsTracker, highlightsTracker+99), BlockType.quote)
+                      hightlightBlocks.slice(highlightsTracker, highlightsTracker+99)
                     );
                     highlightsTracker += 99;
                   }
